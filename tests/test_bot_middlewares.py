@@ -30,6 +30,7 @@ def settings(allowlist: str = "") -> Settings:
         database_url="postgresql+asyncpg://unused",
         telegram_mode="polling",
         allowed_user_ids=allowlist,
+        airtable_token="patTest1234567890.abcdefabcdefabcdefabcd",
     )
 
 

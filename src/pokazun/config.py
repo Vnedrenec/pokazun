@@ -7,6 +7,8 @@ from typing import Literal
 from pydantic import SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from pokazun.catalog.airtable import AIRTABLE_API_URL
+
 WEBHOOK_PATH = "/tg/webhook"
 _SECRET_TOKEN_RE = re.compile(r"^[A-Za-z0-9_-]{16,256}$")
 
@@ -36,6 +38,12 @@ class Settings(BaseSettings):
     backup_marker_path: Path = Path("/backups/last_backup_at")
     web_host: str = "0.0.0.0"  # noqa: S104 — container-internal bind, the proxy is the only entrypoint
     web_port: int = 8080
+    airtable_token: SecretStr | None = None
+    airtable_base_id: str = "appLx30Y68Qy0I9Au"
+    airtable_table_id: str = "tblgO046VTYnqOgZa"
+    airtable_api_url: str = AIRTABLE_API_URL
+    sync_interval_s: int = 300
+    full_sync_interval_h: int = 24
 
     @model_validator(mode="after")
     def _validate(self) -> "Settings":
@@ -57,6 +65,8 @@ class Settings(BaseSettings):
                 raise ValueError("prod requires POKAZUN_ALERT_CHAT_ID")
             if self.telegram_mode != "webhook":
                 raise ValueError("prod must run in webhook mode")
+        if self.env in ("prod", "staging") and self.airtable_token is None:
+            raise ValueError(f"{self.env} requires POKAZUN_AIRTABLE_TOKEN")
         return self
 
     @property

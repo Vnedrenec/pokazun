@@ -8,6 +8,7 @@ BASE = {
     "database_url": "postgresql+asyncpg://u:p@db/pokazun",
     "public_base_url": "https://bot.praktik.cn.ua",
     "webhook_secret": "s" * 32,
+    "airtable_token": "patTest1234567890.abcdefabcdefabcdefabcd",
 }
 
 
@@ -83,4 +84,11 @@ def test_loads_from_env(monkeypatch):
     monkeypatch.setenv("POKAZUN_DATABASE_URL", BASE["database_url"])
     monkeypatch.setenv("POKAZUN_TELEGRAM_MODE", "polling")
     monkeypatch.setenv("POKAZUN_ALLOWED_USER_IDS", "7")
+    monkeypatch.setenv("POKAZUN_AIRTABLE_TOKEN", "patTest1234567890.abcdefabcdefabcdefabcd")
     assert Settings().allowlist == frozenset({7})
+
+
+def test_prod_and_staging_require_airtable_token():
+    for env, extra in (("prod", {"alert_chat_id": -1}), ("staging", {"allowed_user_ids": "1"})):
+        with pytest.raises(ValidationError, match="AIRTABLE_TOKEN"):
+            make(env=env, airtable_token=None, **extra)

@@ -8,6 +8,7 @@ from aiohttp import web
 from pokazun.alerts import AlertService
 from pokazun.bot.factory import build_dispatcher
 from pokazun.bot.handlers import build_routers
+from pokazun.catalog.health import catalog_health
 from pokazun.clock import utcnow
 from pokazun.config import Settings
 from pokazun.db.session import create_engine, create_sessionmaker
@@ -33,6 +34,7 @@ async def create_app(settings: Settings) -> web.Application:
     health = HealthRegistry(
         sessionmaker, started_at=utcnow(), backup_marker_path=settings.backup_marker_path
     )
+    health.register(catalog_health)
     app = build_web_app(
         health=health,
         bot=bot,
