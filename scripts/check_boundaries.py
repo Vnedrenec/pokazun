@@ -6,8 +6,11 @@ from the repository root (derived from this file location, so the result
 does not depend on the current working directory).
 
 Forbidden: direct ``import aiogram`` / ``import aiogram.<...>`` and
-``from aiogram... import ...`` in any nesting level. Strings and comments
-are not imports (AST based). An unparsable file is a failure.
+``from aiogram... import ...`` in any nesting level. Relative imports
+(``from .aiogram import ...``, ``level > 0``) address a local module of
+this repository, not the third-party aiogram package, and are clean.
+Strings and comments are not imports (AST based). An unparsable file
+is a failure.
 
 Empty-state contract (bootstrap):
 - both domain dirs missing -> ``0 domain files``, exit 0;
@@ -19,6 +22,8 @@ from __future__ import annotations
 
 import argparse
 import ast
+import contextlib
+import io
 import sys
 import tempfile
 from pathlib import Path
@@ -34,6 +39,10 @@ def _is_aiogram_import(node: ast.AST) -> str | None:
             if alias.name == "aiogram" or alias.name.startswith("aiogram."):
                 return f"forbidden direct import '{alias.name}'"
     elif isinstance(node, ast.ImportFrom):
+        if node.level:
+            # Relative import (``from .aiogram import Bot``): a local module
+            # of this repository, not the third-party aiogram package.
+            return None
         module = node.module or ""
         if module == "aiogram" or module.startswith("aiogram."):
             return f"forbidden direct import from '{module}'"
@@ -86,15 +95,15 @@ def collect_domain_files(root: Path = REPO_ROOT) -> tuple[list[Path], list[str]]
     return sorted(files), errors
 
 
-def run_scan() -> int:
-    files, dir_errors = collect_domain_files(REPO_ROOT)
+def run_scan(root: Path = REPO_ROOT) -> int:
+    files, dir_errors = collect_domain_files(root)
     if not files and not dir_errors:
         # Both domain dirs missing (bootstrap before Task 1 of stage 4).
         print("0 domain files")
         return 0
     errors: list[str] = list(dir_errors)
     for path in files:
-        errors.extend(check_file(path, REPO_ROOT))
+        errors.extend(check_file(path, root))
     if errors:
         for line in errors:
             print(line)
@@ -177,6 +186,36 @@ def run_self_test() -> int:
         else:
             failures.append(f"probe report: errs={errs}")
             print(f"self-test FAIL: probe reports path and line: {errs}")
+
+    # run_scan propagates the empty-dir collection error to the final exit.
+    # Guards M12 (``errors = []`` instead of ``errors = list(dir_errors)``).
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp_root = Path(tmp)
+        (tmp_root / "src" / "pokazun" / "search").mkdir(parents=True)
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            rc = run_scan(tmp_root)
+        if rc == 1 and "contains no .py files" in buf.getvalue():
+            print("self-test PASS: scan propagates empty-dir error")
+        else:
+            failures.append(f"scan empty-dir propagation: rc={rc} out={buf.getvalue()!r}")
+            print("self-test FAIL: scan propagates empty-dir error")
+
+    # run_scan propagates a SyntaxError to the final exit.
+    # Guards M13 (``check_file`` returning ``[]`` on SyntaxError).
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp_root = Path(tmp)
+        bad = tmp_root / "src" / "pokazun" / "search" / "bad.py"
+        bad.parent.mkdir(parents=True)
+        bad.write_text("def broken(:\n", encoding="utf-8")
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            rc = run_scan(tmp_root)
+        if rc == 1 and "syntax error" in buf.getvalue():
+            print("self-test PASS: scan propagates syntax error")
+        else:
+            failures.append(f"scan syntax-error propagation: rc={rc} out={buf.getvalue()!r}")
+            print("self-test FAIL: scan propagates syntax error")
 
     if failures:
         print(f"self-test FAIL: {len(failures)} case(s) failed")
