@@ -1,0 +1,9 @@
+bot.praktik.cn.ua {
+	encode gzip
+	reverse_proxy pokazun-prod-bot:8080
+}
+
+staging-bot.praktik.cn.ua {
+	encode gzip
+	reverse_proxy pokazun-staging-bot:8080
+}

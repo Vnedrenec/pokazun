@@ -1,0 +1,43 @@
+name: ci
+on:
+  pull_request:
+  push:
+    branches: [main]
+jobs:
+  boundary:
+    name: boundary
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version-file: .python-version
+      - run: python scripts/check_boundaries.py --self-test
+      - run: python scripts/check_boundaries.py
+
+  test:
+    name: test
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: pokazun
+          POSTGRES_PASSWORD: pokazun
+          POSTGRES_DB: pokazun_test_ci_${{ github.run_id }}
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U pokazun"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgresql+asyncpg://pokazun:pokazun@localhost:5432/pokazun_test_ci_${{ github.run_id }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync --frozen
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+      - run: uv run pytest
