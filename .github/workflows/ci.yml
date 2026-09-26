@@ -1,0 +1,16 @@
+name: ci
+on:
+  pull_request:
+  push:
+    branches: [main]
+jobs:
+  boundary:
+    name: boundary
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version-file: .python-version
+      - run: python scripts/check_boundaries.py --self-test
+      - run: python scripts/check_boundaries.py
