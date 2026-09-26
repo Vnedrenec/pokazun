@@ -1,0 +1,89 @@
+name: pokazun-${POKAZUN_ENV:?set POKAZUN_ENV}
+
+x-app: &app
+  image: pokazun:${POKAZUN_ENV}
+  env_file: ${POKAZUN_ENV_FILE:?set POKAZUN_ENV_FILE}
+  restart: unless-stopped
+  depends_on:
+    db:
+      condition: service_healthy
+  logging:
+    driver: local
+    options:
+      max-size: 20m
+      max-file: "5"
+
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: pokazun
+      POSTGRES_USER: pokazun
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks: [internal]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pokazun -d pokazun"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  migrate:
+    <<: *app
+    restart: "no"
+    command: ["alembic", "upgrade", "head"]
+    networks: [internal]
+    profiles: ["migrate"]
+
+  bot:
+    <<: *app
+    command: ["python", "-m", "pokazun.app"]
+    volumes:
+      - logs:/var/log/pokazun
+      - state:/var/lib/pokazun
+      - backups:/backups:ro
+    networks:
+      internal: {}
+      edge:
+        aliases: ["pokazun-${POKAZUN_ENV}-bot"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/healthz', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  worker:
+    <<: *app
+    command: ["python", "-m", "pokazun.worker.main"]
+    volumes:
+      - logs:/var/log/pokazun
+      - state:/var/lib/pokazun
+      - backups:/backups:ro
+    networks: [internal, edge]
+
+  backup:
+    build: ./backup
+    image: pokazun-backup:16
+    restart: unless-stopped
+    env_file: ${POKAZUN_ENV_FILE}
+    volumes:
+      - backups:/backups
+    networks: [internal, edge]
+    depends_on:
+      db:
+        condition: service_healthy
+    profiles: ["backup"]
+
+networks:
+  internal: {}
+  edge:
+    external: true
+    name: pokazun-edge
+
+volumes:
+  pgdata: {}
+  logs: {}
+  state: {}
+  backups: {}
