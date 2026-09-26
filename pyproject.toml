@@ -1,0 +1,51 @@
+[project]
+name = "pokazun"
+version = "0.1.0"
+description = "Pokazun — Telegram bot for apartment search (Praktik Real Estate, Chernihiv)"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "aiogram>=3.15,<4",
+    "aiohttp>=3.10",
+    "sqlalchemy[asyncio]>=2.0.36,<2.1",
+    "asyncpg>=0.30",
+    "alembic>=1.14",
+    "pydantic-settings>=2.6",
+    "structlog>=24.4",
+    "tzdata>=2024.2",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "pytest-asyncio>=0.24",
+    "pytest-cov>=6.0",
+    "ruff>=0.8",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/pokazun"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
+addopts = "-ra --strict-markers --strict-config --cov=src/pokazun --cov-branch --cov-report=term-missing --cov-fail-under=85"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src", "tests"]
+# Docs hold frozen plan specifications with illustrative snippets; reformatting
+# them would edit those files, so only real code is formatted.
+exclude = ["docs/"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "ASYNC", "RUF", "S", "DTZ"]
+ignore = ["S101", "RUF001", "RUF002", "RUF003"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S105", "S106", "S311"]

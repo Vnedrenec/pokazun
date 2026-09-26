@@ -88,9 +88,7 @@ def collect_domain_files(root: Path = REPO_ROOT) -> tuple[list[Path], list[str]]
             existing_dirs += 1
             found = sorted(d.rglob("*.py"))
             if not found:
-                errors.append(
-                    f"FAIL: {d.relative_to(root)} exists but contains no .py files"
-                )
+                errors.append(f"FAIL: {d.relative_to(root)} exists but contains no .py files")
             files.extend(found)
     return sorted(files), errors
 
@@ -128,7 +126,7 @@ def run_self_test() -> int:
             print(f"self-test PASS: {name}")
         else:
             failures.append(f"{name}: expected violation={expect_violation}, got={violations}")
-            print(f"self-test FAIL: {name}: expected violation={expect_violation}, got={violations}")
+            print(f"self-test FAIL: {failures[-1]}")
 
     # Allowed import is green.
     check("allowed import math", "import math\n", False)
