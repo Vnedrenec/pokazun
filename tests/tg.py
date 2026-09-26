@@ -14,6 +14,7 @@ from aiogram.types import (
     ChatMemberBanned,
     ChatMemberMember,
     ChatMemberUpdated,
+    InaccessibleMessage,
     InlineQuery,
     Message,
     Update,
@@ -171,5 +172,21 @@ def my_chat_member_update(status: str, *, user: User | None = None) -> Update:
             date=datetime.now(UTC),
             old_chat_member=old,
             new_chat_member=new,
+        ),
+    )
+
+
+def inaccessible_callback_update(data: str, *, user: User | None = None) -> Update:
+    user = user or tg_user()
+    return Update(
+        update_id=next(_update_ids),
+        callback_query=CallbackQuery(
+            id=f"cb{next(_update_ids)}",
+            from_user=user,
+            chat_instance="ci",
+            data=data,
+            message=InaccessibleMessage(
+                chat=Chat(id=user.id, type="private"), message_id=1, date=0
+            ),
         ),
     )
