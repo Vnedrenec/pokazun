@@ -7,6 +7,7 @@ from sqlalchemy import func, select, text
 from structlog.testing import capture_logs
 
 from pokazun.alerts import AlertService
+from pokazun.catalog.record import parse_record
 from pokazun.catalog.state import TransitionKind as K
 from pokazun.catalog.sync import SOURCE, SYNC_LOCK_KEY, CatalogSync, SyncMode
 from pokazun.db.models import ObjectState, SyncState
@@ -243,6 +244,19 @@ async def test_data_quality_warnings_logged_and_record_kept(world, sessionmaker)
     async with sessionmaker() as s:
         row = await s.scalar(select(ObjectState))
     assert row.eligible is True and row.price_segment is None
+
+
+async def test_raw_airtable_payload_never_logged(world, sessionmaker):
+    sync, source, _sink, _clock, _ = world
+    raw = raw_record("rec9", 9, segment=None)
+    assert "+380671112233" in repr(raw)
+    with capture_logs() as logs:
+        parse_record(raw)
+        source.put(raw, T0)
+        report = await sync.run()
+    assert report.warnings >= 1
+    assert any(e.get("event") == "data_quality" for e in logs)
+    assert "+380671112233" not in repr(logs)
 
 
 async def test_record_without_code_is_skipped(world, sessionmaker):
