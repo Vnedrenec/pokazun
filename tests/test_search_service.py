@@ -108,6 +108,18 @@ async def test_confirm_creates_search_with_baseline(sessionmaker, user_id):
     assert user.subscription_state is SubscriptionState.ACTIVE
 
 
+async def test_confirm_first_search_reactivates_paused_user(sessionmaker, user_id):
+    async with sessionmaker() as s, s.begin():
+        (await s.get(User, user_id)).subscription_state = SubscriptionState.PAUSED_BY_USER
+    result = await fill_and_confirm(sessionmaker, user_id)
+    assert result.created is True
+    async with sessionmaker() as s:
+        user = await s.get(User, user_id)
+        search = await get_active_search(s, user_id)
+    assert user.subscription_state is SubscriptionState.ACTIVE
+    assert search is not None and search.baseline_at == T0
+
+
 async def test_confirm_without_draft_returns_none(sessionmaker, user_id):
     async with sessionmaker() as s, s.begin():
         assert await confirm_draft(s, await s.get(User, user_id), T0) is None

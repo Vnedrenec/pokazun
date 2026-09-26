@@ -70,6 +70,19 @@ def test_labels_order_is_stable():
     assert texts.conditions_label(frozenset(ConditionGroup)) == "Житловий стан, Після забудовника"
 
 
+@pytest.mark.parametrize(
+    ("actual", "expected"),
+    [
+        (texts.BTN_NEXT, "Далі ➡️"),
+        (texts.MENU_HINT, "Скористайтеся кнопками меню нижче 👇"),
+        (texts.EDIT_CANCELLED, "Параметри пошуку не змінено."),
+        (texts.BTN_HELP, "Допомога"),
+    ],
+)
+def test_pinned_ui_texts_match_d1_verbatim(actual, expected):
+    assert actual == expected
+
+
 def test_found_text():
     assert texts.found_text(47).startswith("Знайшли 47 квартир за вашим запитом 🏠\n\n")
     assert texts.found_text(1).startswith("Знайшли 1 квартиру ")
