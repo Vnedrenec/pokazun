@@ -75,6 +75,7 @@ def _settings(**kw) -> Settings:
         "database_url": "postgresql+asyncpg://unused",
         "public_base_url": "https://bot.example",
         "webhook_secret": "s" * 32,
+        "airtable_token": "patTest1234567890.abcdefabcdefabcdefabcd",
     }
     return Settings(**{**base, **kw})
 
@@ -95,3 +96,21 @@ def test_build_jobs_dev_polling(sessionmaker):
         _settings(env="dev", telegram_mode="polling"), sessionmaker, AlertService(None, None, "dev")
     )
     assert {j.name for j in jobs} == {"cleanup_processed_updates"}
+
+
+def test_build_jobs_with_airtable(sessionmaker):
+    class NoSource:
+        async def iter_records(self, *, fields, modified_after=None):
+            return
+            yield
+
+    jobs = build_jobs(
+        _settings(env="prod", alert_chat_id=-1),
+        sessionmaker,
+        AlertService(None, None, "prod"),
+        airtable=NoSource(),
+    )
+    by_name = {j.name: j for j in jobs}
+    assert {"catalog_sync", "sync_freshness"} <= set(by_name)
+    assert by_name["catalog_sync"].interval == timedelta(minutes=5)
+    assert by_name["catalog_sync"].alert_on_failure is False

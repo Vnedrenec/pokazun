@@ -7,6 +7,8 @@ from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from pokazun.alerts import Alert, AlertService
+from pokazun.catalog.health import check_sync_freshness
+from pokazun.catalog.sync import CatalogSync, RecordSource
 from pokazun.clock import utcnow
 from pokazun.config import Settings
 from pokazun.db.models import ProcessedUpdate
@@ -95,6 +97,7 @@ def build_jobs(
     sessionmaker: async_sessionmaker[AsyncSession],
     alerts: AlertService,
     *,
+    airtable: RecordSource | None = None,
     clock: Callable[[], datetime] = utcnow,
 ) -> list[Job]:
     async def cleanup() -> None:
@@ -110,4 +113,28 @@ def build_jobs(
     if settings.telegram_mode == "webhook":
         check = PublicHealthCheck(settings.public_base_url.rstrip("/") + "/healthz", alerts)
         jobs.append(Job("public_health", timedelta(minutes=5), check.run, run_on_start=False))
+    if airtable is not None:
+        sync = CatalogSync(
+            source=airtable,
+            sessionmaker=sessionmaker,
+            alerts=alerts,
+            full_sync_interval=timedelta(hours=settings.full_sync_interval_h),
+            clock=clock,
+        )
+
+        async def run_sync() -> None:
+            await sync.run()
+
+        async def freshness() -> None:
+            await check_sync_freshness(sessionmaker, alerts, now=clock())
+
+        jobs.append(
+            Job(
+                "catalog_sync",
+                timedelta(seconds=settings.sync_interval_s),
+                run_sync,
+                alert_on_failure=False,
+            )
+        )
+        jobs.append(Job("sync_freshness", timedelta(minutes=5), freshness, run_on_start=False))
     return jobs

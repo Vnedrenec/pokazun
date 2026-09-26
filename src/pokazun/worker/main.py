@@ -3,9 +3,11 @@
 import asyncio
 import signal
 
+import aiohttp
 from aiogram import Bot
 
 from pokazun.alerts import AlertService
+from pokazun.catalog.airtable import AirtableClient
 from pokazun.clock import utcnow
 from pokazun.config import Settings
 from pokazun.db.session import create_engine, create_sessionmaker
@@ -25,16 +27,28 @@ async def run(settings: Settings) -> None:
     await check_restart_loop(
         settings.state_dir / "worker-starts.json", alerts, service="worker", now=utcnow()
     )
-    scheduler = Scheduler(alerts)
-    for job in build_jobs(settings, sessionmaker, alerts):
-        scheduler.add(job)
     stop = asyncio.Event()
     loop = asyncio.get_running_loop()
     for sig in (signal.SIGTERM, signal.SIGINT):
         loop.add_signal_handler(sig, stop.set)
-    log.info("worker_started", env=settings.env)
     try:
-        await scheduler.run(stop)
+        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=60)) as http:
+            airtable = (
+                AirtableClient(
+                    token=settings.airtable_token.get_secret_value(),
+                    base_id=settings.airtable_base_id,
+                    table_id=settings.airtable_table_id,
+                    session=http,
+                    api_url=settings.airtable_api_url,
+                )
+                if settings.airtable_token is not None
+                else None
+            )
+            scheduler = Scheduler(alerts)
+            for job in build_jobs(settings, sessionmaker, alerts, airtable=airtable):
+                scheduler.add(job)
+            log.info("worker_started", env=settings.env, airtable=airtable is not None)
+            await scheduler.run(stop)
     finally:
         await bot.session.close()
         await engine.dispose()
