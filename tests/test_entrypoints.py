@@ -23,8 +23,8 @@ def _settings(tmp_path) -> Settings:
     )
 
 
-def test_build_routers_is_empty_on_stage_3():
-    assert build_routers() == []
+def test_build_routers_contains_search_setup_then_fallback():
+    assert [router.name for router in build_routers()] == ["search_setup", "fallback"]
 
 
 async def test_create_app_registers_healthz(tmp_path):
