@@ -1,3 +1,5 @@
+import asyncio
+import time
 from datetime import UTC, datetime, timedelta
 
 from aiogram.methods import SetWebhook
@@ -64,6 +66,41 @@ async def test_healthz_db_down_returns_503(tmp_path):
     assert resp.status == 503
     assert body["db"] == "error"
     await engine.dispose()
+
+
+class _HangingSession:
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *exc):
+        return False
+
+    async def execute(self, *args, **kwargs):
+        await asyncio.sleep(30)
+        return None
+
+
+class _HangingSessionmaker:
+    def __call__(self):
+        return _HangingSession()
+
+
+async def test_healthz_slow_db_returns_503_within_timeout():
+    health = HealthRegistry(
+        _HangingSessionmaker(),  # type: ignore[arg-type]
+        started_at=T0,
+        backup_marker_path=None,
+        db_timeout=0.2,
+    )
+    async with TestClient(TestServer(build_web_app(health=health))) as client:
+        async with asyncio.timeout(5):
+            start = time.monotonic()
+            resp = await client.get("/healthz")
+            body = await resp.json()
+            elapsed = time.monotonic() - start
+    assert resp.status == 503
+    assert body["db"] == "error"
+    assert elapsed < 5
 
 
 async def test_webhook_rejects_wrong_secret_and_sets_webhook(sessionmaker):

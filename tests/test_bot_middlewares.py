@@ -4,14 +4,21 @@ import pytest
 from aiogram import Router
 from aiogram.filters import Command
 from aiogram.methods import SendMessage
-from aiogram.types import Message
+from aiogram.types import InlineQuery, Message
 from sqlalchemy import func, select, update
 
 from pokazun.alerts import AlertService
 from pokazun.bot.factory import build_dispatcher
 from pokazun.config import Settings
 from pokazun.db.models import DeliveryState, ProcessedUpdate, User
-from tests.tg import group_message_update, make_bot, message_update, my_chat_member_update, tg_user
+from tests.tg import (
+    group_message_update,
+    inline_query_update,
+    make_bot,
+    message_update,
+    my_chat_member_update,
+    tg_user,
+)
 
 NOW = datetime(2026, 10, 1, 9, 0, tzinfo=UTC)
 
@@ -38,6 +45,10 @@ def probe_router(calls: list[str]) -> Router:
     async def boom(message: Message) -> None:
         calls.append("boom")
         raise RuntimeError("handler exploded")
+
+    @router.inline_query()
+    async def inline(inline_query: InlineQuery) -> None:
+        calls.append(f"inline:{inline_query.from_user.id}")
 
     return router
 
@@ -113,6 +124,20 @@ async def test_allowlist_admits_listed(env, sessionmaker):
 async def test_group_chats_ignored(env, sessionmaker):
     dp, bot, _, calls = env()
     await dp.feed_update(bot, group_message_update("/ping"))
+    assert calls == []
+    assert await count(sessionmaker, User) == 0
+
+
+async def test_chatless_update_blocked_without_allowlist(env, sessionmaker):
+    dp, bot, _, calls = env()
+    await dp.feed_update(bot, inline_query_update())
+    assert calls == []
+    assert await count(sessionmaker, User) == 0
+
+
+async def test_chatless_update_blocked_with_allowlist(env, sessionmaker):
+    dp, bot, _, calls = env(allowlist="5001")
+    await dp.feed_update(bot, inline_query_update(user=tg_user(user_id=5001)))
     assert calls == []
     assert await count(sessionmaker, User) == 0
 

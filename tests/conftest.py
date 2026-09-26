@@ -50,9 +50,9 @@ def _guard_database_url(url: str) -> str:
             ref = make_url(_ORIGINAL_DATABASE_URL)
         except Exception:
             ref = None
-        if ref is not None and (ref.host, ref.port, ref.database) == (
+        if ref is not None and (ref.host, ref.port or 5432, ref.database) == (
             parsed.host,
-            parsed.port,
+            parsed.port or 5432,
             parsed.database,
         ):
             pytest.fail(

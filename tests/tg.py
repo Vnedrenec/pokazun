@@ -14,6 +14,7 @@ from aiogram.types import (
     ChatMemberBanned,
     ChatMemberMember,
     ChatMemberUpdated,
+    InlineQuery,
     Message,
     Update,
     User,
@@ -139,6 +140,21 @@ def callback_update(
                 from_user=_bot_user(),
                 text="…",
             ),
+        ),
+    )
+
+
+def inline_query_update(
+    query: str = "flat", *, user: User | None = None, update_id: int | None = None
+) -> Update:
+    user = user or tg_user()
+    return Update(
+        update_id=update_id if update_id is not None else next(_update_ids),
+        inline_query=InlineQuery(
+            id=f"iq{next(_update_ids)}",
+            from_user=user,
+            query=query,
+            offset="",
         ),
     )
 

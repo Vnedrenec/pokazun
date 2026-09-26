@@ -53,7 +53,7 @@ class AccessMiddleware(BaseMiddleware):
         chat: Chat | None = data.get("event_chat")
         if user is None or user.is_bot:
             return None
-        if chat is not None and chat.type != ChatType.PRIVATE:
+        if chat is None or chat.type != ChatType.PRIVATE:
             return None
         if self._allowlist and user.id not in self._allowlist:
             log.info("user_not_in_allowlist", telegram_user_id=user.id)
